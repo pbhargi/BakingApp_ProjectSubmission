@@ -1,0 +1,21 @@
+<resources>
+
+    <string name="app_name">Recipes</string>
+
+    <!-- Detail Activity-->
+    <string name="movie_poster_label">Movie Poster</string>
+
+    <string name="trailer_label">Trailers:</string>
+    <string name="reviews_label">Reviews:</string>
+    <string name="mark_as_favorite">Mark as Favorite</string>
+    <string name="remove_from_favorites">Remove from Favorites</string>
+    <!-- Error messages-->
+    <string name="detail_error_message">Recipe data not available</string>
+
+    <string name="error_message">
+        An error has occurred. Please try again by clicking one of the menu options.
+    </string>
+    <string name="appwidget_text">My Baking Recipes</string>
+    <string name="add_widget">Add Baking Widget</string>
+
+</resources>
