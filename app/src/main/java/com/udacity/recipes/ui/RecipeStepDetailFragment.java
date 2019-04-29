@@ -1,38 +1,30 @@
 package com.udacity.recipes.ui;
 
-import android.app.Notification;
-import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
 import android.support.v4.app.Fragment;
-import android.support.v4.app.NotificationCompat;
 import android.support.v4.media.session.MediaButtonReceiver;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
 import android.support.v7.widget.CardView;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.TextView;
-import android.widget.Toast;
 
+import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.DefaultLoadControl;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.LoadControl;
+import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
@@ -46,15 +38,17 @@ import com.google.android.exoplayer2.ui.SimpleExoPlayerView;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.util.Util;
 import com.udacity.recipes.R;
-import com.udacity.recipes.adapters.RecipeStepsRVAdapter;
 import com.udacity.recipes.model.Recipe;
 import com.udacity.recipes.utils.NetworkUtils;
 
-import static android.content.Context.NOTIFICATION_SERVICE;
-
 public class RecipeStepDetailFragment extends Fragment implements ExoPlayer.EventListener {
 
-    String TAG = RecipeStepDetailFragment.class.getSimpleName();
+    @Override
+    public void onShuffleModeEnabledChanged(boolean boo){
+
+    }
+
+    public String TAG = RecipeStepDetailFragment.class.getSimpleName();
     private Recipe.RecipeStep mSelectedRecipeStep;
 
     public Recipe.RecipeStep getSelectedRecipeStep() {
@@ -110,7 +104,7 @@ public class RecipeStepDetailFragment extends Fragment implements ExoPlayer.Even
         Bundle args = new Bundle();
         args.putParcelable("selectedRecipeStep", selectedRecipeStep);
         recipeStepDetailFragment.setArguments(args);
-        Log.d(RecipeStepDetailFragment.class.getSimpleName(), "In newInstance of RecipeDetailFragment. Recipe Step received from args: "+selectedRecipeStep);
+        Log.d(RecipeStepDetailFragment.class.getSimpleName(), "In newInstance of RecipeStepDetailFragment. Recipe Step received from args: "+selectedRecipeStep);
         return recipeStepDetailFragment;
     }
 
@@ -120,6 +114,14 @@ public class RecipeStepDetailFragment extends Fragment implements ExoPlayer.Even
         // Get back arguments
         mSelectedRecipeStep = (Recipe.RecipeStep) getArguments().getParcelable("selectedRecipeStep");
         Log.d(TAG, "In oncreate of RecipeDetailFragment. Recipe received from args: "+mSelectedRecipeStep);
+        if (savedInstanceState != null) {
+            startAutoPlay = savedInstanceState.getBoolean(KEY_AUTO_PLAY);
+            startWindow = savedInstanceState.getInt(KEY_WINDOW);
+            startPosition = savedInstanceState.getLong(KEY_POSITION);
+            Log.d(TAG, "onCreate of StepDetailFragemnt after reading savedInstanceState, startAutoPlay: "+startAutoPlay+", startWindow: "+startWindow+", startPosition: "+startPosition);
+        } else {
+            clearStartPosition();
+        }
     }
 
     // Inflates the GridView of all AndroidMe images
@@ -152,11 +154,18 @@ public class RecipeStepDetailFragment extends Fragment implements ExoPlayer.Even
 
         initializeMediaSession();
 
-        Uri recipeStepMediaUri = NetworkUtils.buildUri(mSelectedRecipeStep.getRecipeStepMedia());
-
         // Initialize the player.
-        initializePlayer(recipeStepMediaUri);
+        initializePlayer();
 
+        if(mExoPlayer!=null) {
+            mExoPlayer.setPlayWhenReady(startAutoPlay);
+            Log.d(TAG, "onCreateView of StepDetailFragment, mExoPlayer startAutoPlay: " + startAutoPlay);
+            boolean haveStartPosition = startWindow != C.INDEX_UNSET;
+            if (haveStartPosition) {
+                mExoPlayer.seekTo(startWindow, startPosition);
+                Log.d(TAG, "onCreateView of StepDetailFragment, mExoPlayer moved to startPosition: " + startPosition);
+            }
+        }
         // Return the root view
         return rootView;
     }
@@ -167,11 +176,9 @@ public class RecipeStepDetailFragment extends Fragment implements ExoPlayer.Even
             case ExoPlaybackException.TYPE_SOURCE:
                 Log.e(TAG, "TYPE_SOURCE: " + error.getSourceException().getMessage());
                 break;
-
             case ExoPlaybackException.TYPE_RENDERER:
                 Log.e(TAG, "TYPE_RENDERER: " + error.getRendererException().getMessage());
                 break;
-
             case ExoPlaybackException.TYPE_UNEXPECTED:
                 Log.e(TAG, "TYPE_UNEXPECTED: " + error.getUnexpectedException().getMessage());
                 break;
@@ -214,72 +221,13 @@ public class RecipeStepDetailFragment extends Fragment implements ExoPlayer.Even
 
     }
 
-
-    /**
-     * Shows Media Style notification, with an action that depends on the current MediaSession
-     * PlaybackState.
-     * @param state The PlaybackState of the MediaSession.
-     */
-    /*private void showNotification(PlaybackStateCompat state) {
-        NotificationChannel channel = null;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            String CHANNEL_ID = "CHANNEL_ID";
-            CharSequence name = "Channel Name";
-            String description = "Channel Description";
-            int importance = NotificationManager.IMPORTANCE_DEFAULT;
-            channel = new NotificationChannel(CHANNEL_ID, name, importance);
-            channel.setDescription(description);
-            // Register the channel with the system; you can't change the importance
-            // or other notification behaviors after this
-            NotificationManager notificationManager = getActivity().getSystemService(NotificationManager.class);
-            notificationManager.createNotificationChannel(channel);
-        }
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(getContext(), "CHANNEL_ID");
-
-        int icon;
-        String play_pause;
-        if(state.getState() == PlaybackStateCompat.STATE_PLAYING){
-            icon = R.drawable.exo_controls_pause;
-            play_pause = getString(R.string.pause);
-        } else {
-            icon = R.drawable.exo_controls_play;
-            play_pause = getString(R.string.play);
-        }
-
-
-        NotificationCompat.Action playPauseAction = new NotificationCompat.Action(
-                icon, play_pause,
-                MediaButtonReceiver.buildMediaButtonPendingIntent(getContext(),
-                        PlaybackStateCompat.ACTION_PLAY_PAUSE));
-
-        NotificationCompat.Action restartAction = new android.support.v4.app.NotificationCompat
-                .Action(R.drawable.exo_controls_previous, getString(R.string.restart),
-                MediaButtonReceiver.buildMediaButtonPendingIntent
-                        (getContext(), PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS));
-
-        PendingIntent contentPendingIntent = PendingIntent.getActivity
-                (getContext(), 0, new Intent(getContext(), RecipeStepDetailFragment.class), 0);
-
-        builder.setContentTitle("Recipe Step Media Notification Title")
-                .setContentText("Recipe Step Media Notification Text")
-                .setContentIntent(contentPendingIntent)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .addAction(restartAction)
-                .addAction(playPauseAction);
-
-
-        mNotificationManager = (NotificationManager)getActivity().getSystemService(NOTIFICATION_SERVICE);
-        mNotificationManager.notify(0, builder.build());
-    }*/
-
-
     /**
      * Initialize ExoPlayer.
-     * @param mediaUri The URI of the sample to play.
      */
-    private void initializePlayer(Uri mediaUri) {
+    private void initializePlayer() {
         if (mExoPlayer == null) {
             // Create an instance of the ExoPlayer.
+            Uri recipeStepMediaUri = NetworkUtils.buildUri(mSelectedRecipeStep.getRecipeStepMedia());
             TrackSelector trackSelector = new DefaultTrackSelector();
             LoadControl loadControl = new DefaultLoadControl();
             mExoPlayer = ExoPlayerFactory.newSimpleInstance(getContext(), trackSelector, loadControl);
@@ -289,11 +237,17 @@ public class RecipeStepDetailFragment extends Fragment implements ExoPlayer.Even
             mExoPlayer.addListener(this);
 
             // Prepare the MediaSource.
-            String userAgent = Util.getUserAgent(getContext(), "ClassicalMusicQuiz");
-            MediaSource mediaSource = new ExtractorMediaSource(mediaUri, new DefaultDataSourceFactory(
+            String userAgent = Util.getUserAgent(getContext(), "Baking App");
+            MediaSource mediaSource = new ExtractorMediaSource(recipeStepMediaUri, new DefaultDataSourceFactory(
                     getContext(), userAgent), new DefaultExtractorsFactory(), null, null);
             mExoPlayer.prepare(mediaSource);
-            mExoPlayer.setPlayWhenReady(true);
+            Log.d(TAG, "initializePlayer, startAutoPlay: "+startAutoPlay+", startWindow: "+startWindow+", startPosition: "+startPosition);
+            mExoPlayer.setPlayWhenReady(startAutoPlay);
+            boolean haveStartPosition = startWindow != C.INDEX_UNSET;
+            if (haveStartPosition) {
+                mExoPlayer.seekTo(startWindow, startPosition);
+                Log.d(TAG, "initializePlayer, mExoPlayer moved to startPosition: "+startPosition);
+            }
         }
     }
 
@@ -311,21 +265,39 @@ public class RecipeStepDetailFragment extends Fragment implements ExoPlayer.Even
     }
 
 
-    /**
-     * Release the player when the activity is destroyed.
-     */
     @Override
-    public void onDestroy() {
-        super.onDestroy();
-        releasePlayer();
-        if(mMediaSession!=null)
-            mMediaSession.setActive(false);
+    public void onPause() {
+        super.onPause();
+        if (Util.SDK_INT <= 23) {
+            releasePlayer();
+        }
     }
 
+    @Override
+    public void onStop() {
+        super.onStop();
+        if (Util.SDK_INT > 23) {
+            releasePlayer();
+        }
+    }
 
     // ExoPlayer Event Listeners
     @Override
-    public void onTimelineChanged(Timeline timeline, Object manifest) {
+    public void onSeekProcessed() {
+    }
+
+    @Override
+    public void onPlaybackParametersChanged(PlaybackParameters paras) {
+    }
+
+    @Override
+    public void onPositionDiscontinuity(int i){
+
+    }
+
+    @Override
+    public void onTimelineChanged(Timeline timeline, Object manifest, int reason) {
+
     }
 
     @Override
@@ -352,14 +324,17 @@ public class RecipeStepDetailFragment extends Fragment implements ExoPlayer.Even
             mStateBuilder.setState(PlaybackStateCompat.STATE_PAUSED,
                     mExoPlayer.getCurrentPosition(), 1f);
         }
-        mMediaSession.setPlaybackState(mStateBuilder.build());
+
+        //mMediaSession.setPlaybackState(mStateBuilder.build());
         //showNotification(mStateBuilder.build());
     }
 
-
     @Override
-    public void onPositionDiscontinuity() {
+    public void onRepeatModeChanged(int repeatMode) {
+
     }
+
+
 
     /**
      * Media Session Callbacks, where all external clients control the player.
@@ -394,4 +369,38 @@ public class RecipeStepDetailFragment extends Fragment implements ExoPlayer.Even
             MediaButtonReceiver.handleIntent(mMediaSession, intent);
         }
     }
+
+
+    private boolean startAutoPlay;
+    private int startWindow;
+    private long startPosition;
+    private static final String KEY_POSITION = "position";
+    private static final String KEY_AUTO_PLAY = "auto_play";
+    private static final String KEY_WINDOW = "window";
+
+    private void updateStartPosition() {
+        if (mExoPlayer != null) {
+            startAutoPlay = mExoPlayer.getPlayWhenReady();
+            startWindow = mExoPlayer.getCurrentWindowIndex();
+            startPosition = Math.max(0, mExoPlayer.getCurrentPosition());
+        }
+    }
+
+    private void clearStartPosition() {
+        startAutoPlay = true;
+        startPosition = C.TIME_UNSET;
+        startWindow = C.INDEX_UNSET;
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        Log.d(TAG, "beginning of onSaveInstanceState of StepDetailFragemnt, startAutoPlay: "+startAutoPlay+", startWindow: "+startWindow+", startPosition: "+startPosition);
+        updateStartPosition();
+        outState.putBoolean(KEY_AUTO_PLAY, startAutoPlay);
+        outState.putInt(KEY_WINDOW, startWindow);
+        outState.putLong(KEY_POSITION, startPosition);
+        Log.d(TAG, "end of onSaveInstanceState of StepDetailFragemnt, startAutoPlay: "+startAutoPlay+", startWindow: "+startWindow+", startPosition: "+startPosition);
+    }
+
+
 }

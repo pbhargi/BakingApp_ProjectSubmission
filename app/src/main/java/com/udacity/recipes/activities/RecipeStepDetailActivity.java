@@ -2,6 +2,7 @@ package com.udacity.recipes.activities;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -18,7 +19,7 @@ import java.util.ArrayList;
 
 public class RecipeStepDetailActivity extends AppCompatActivity implements RecipeStepDetailFragment.OnRecipeStepDumbListener {
 
-    private static final String TAG = MainActivity.class.getSimpleName();
+    private static final String TAG = RecipeStepDetailActivity.class.getSimpleName();
 
     private ArrayList<Recipe.RecipeStep> mRecipeSteps;
     private Recipe.RecipeStep mSelectedRecipeStep;
@@ -90,19 +91,23 @@ public class RecipeStepDetailActivity extends AppCompatActivity implements Recip
         if (savedInstanceState != null && savedInstanceState.getSerializable(FragmentUtils.INTENT_EXTRA_SERIALIZE_DATA)!=null){
             mSelectedRecipeStepIndex = savedInstanceState.getInt(FragmentUtils.INTENT_EXTRA_SELECTED_RECIPE_INDEX, 0);
             mRecipeSteps = savedInstanceState.getParcelableArrayList(FragmentUtils.INTENT_EXTRA_SERIALIZE_DATA);
+            if(mRecipeSteps!=null)
+                mSelectedRecipeStep = mRecipeSteps.get(mSelectedRecipeStepIndex);
+
             Log.d(TAG, "in detailactivity from savedinstancestate mSelectedRecipeStepObj: "+ mSelectedRecipeStep);
             savedInstanceState.clear();
         } else if (intent != null) {
             mSelectedRecipeStepIndex = intent.getIntExtra(FragmentUtils.INTENT_EXTRA_SELECTED_RECIPE_INDEX, 0);
             mRecipeSteps = intent.getParcelableArrayListExtra(FragmentUtils.INTENT_EXTRA_SERIALIZE_DATA);
             Log.d(TAG, "in detailactivity from intent mSelectedRecipeStepIndex: "+ mSelectedRecipeStepIndex +", mSelectedRecipeStepObj: "+ mSelectedRecipeStep);
+            if(mRecipeSteps!=null)
+                mSelectedRecipeStep = mRecipeSteps.get(mSelectedRecipeStepIndex);
+
+            FragmentUtils.setUpRecipeStepDetailFragment(getSupportFragmentManager(), mSelectedRecipeStep);
         } else {
             Log.d(TAG, "in detailactivity both savesinstancestate and intent are null closeOnError");
             closeOnError();
         }
-
-        if(mRecipeSteps!=null)
-            mSelectedRecipeStep = mRecipeSteps.get(mSelectedRecipeStepIndex);
 
         Log.d(TAG, "in detailactivity from intent mSelectedRecipeStep: "+mSelectedRecipeStep);
         if (mSelectedRecipeStep == null) {
@@ -111,7 +116,6 @@ public class RecipeStepDetailActivity extends AppCompatActivity implements Recip
             return;
         }
 
-        FragmentUtils.setUpRecipeStepDetailFragment(getSupportFragmentManager(), mSelectedRecipeStep);
     }
 
 
